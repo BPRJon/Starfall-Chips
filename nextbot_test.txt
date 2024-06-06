@@ -1,0 +1,29 @@
+--@name nextbot test
+--@author jon b
+--@server
+
+local function KeyPress(ply,key)
+    
+    if ply:keyDown(IN_KEY[key]) then return 1
+    else return 0 end
+        
+end
+
+Nextbot = nextbot.create(chip():getPos(),"models/breen.mdl")
+Nextbot:setMaxHealth(300)
+Nextbot:setHealth(300)
+Nextbot:setMoveSpeed(100)
+
+runto = chip():getPos()
+
+hook.add("Tick", "update tick", function()
+    
+    if KeyPress(owner(),"RELOAD") == 1 then
+        Nextbot:setGotoPos(owner():getEyeTrace().HitPos+Vector(0,0,50))
+    end
+    if KeyPress(owner(),"ATTACK2") == 1 then
+        Nextbot:removeGotoPos()
+    end
+    
+end)
+

@@ -1,0 +1,33 @@
+--@name Holo Creator
+--@author jon b
+--@server
+
+--Table for creating holos
+    local HoloTbl = {
+        --{pos     ,ang     ,model path                      , scale  ,color                  , mat (optional)}
+        --{Vector(),Angle(),"models/balloons/balloon_dog.mdl",Vector(1),Color(255,255,255,255)}
+    }
+    
+    function CreateHolos(ent,tbl)
+        holocreate = coroutine.create(function()
+            for i,v in pairs(tbl) do
+                local holo = hologram.create(tbl[i][1]+ent:getPos(),tbl[i][2]+ent:getAngles(),tbl[i][3],tbl[i][4])
+                holo:setParent(ent)
+                holo:setColor(tbl[i][5])
+                if tbl[i][6] != nil then
+                    holo:setMaterial(tbl[i][6])
+                end
+                if chip():getQuotaUsed() > chip():getQuotaMax()*0.5 then
+                    coroutine.wait(1)
+                end
+            end
+            print("Holos Created!")
+        end)
+    end
+    
+    hook.add("tick","tickupdate", function()
+        if coroutine.status(holocreate) == "suspended" then
+            coroutine.resume(holocreate)
+        end
+        
+    end)

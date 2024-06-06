@@ -1,0 +1,9 @@
+--@name The Deciple
+--@author jon b
+--@server
+
+TheDeciple = nextbot.create(chip():getPos(),"models/Kleiner.mdl")
+
+hook.add("tick","move tick", function()
+    TheDeciple:setGotoPos(owner():getPos()+(Vector(0,40,0):getRotated(owner():getAngles():setP(0))))
+end)

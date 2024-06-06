@@ -1,0 +1,25 @@
+--@name Hover Machine
+--@author jon b
+--@server
+
+function KeyPress(ply, key)
+    
+    if ply:keyDown(IN_KEY[key]) then return 1
+    else return 0 end
+    
+end
+
+Chair = prop.createSeat(chip():getPos()+Vector(0,0,30), Angle(0),"models/nova/jalopy_seat.mdl",false)
+--Chair:enableDrag(false)
+
+hook.add("Think", "Movement", function()
+
+    local Driver = Chair:getDriver()
+    --Chair:setAngles(Angle(0))
+    
+    if Driver:isValid() then
+        Chair:addVelocity(Vector(KeyPress(Driver,"MOVERIGHT")-KeyPress(Driver,"MOVELEFT"),KeyPress(Driver,"FORWARD")-KeyPress(Driver,"BACK"),KeyPress(Driver,"JUMP")-KeyPress(Driver,"WALK")+6*game.getTickInterval())*100)
+        Chair:addAngleVelocity(-Chair:getAngles():getQuaternion():getRotationVector()*0.1 - Chair:getAngleVelocity()*0.1)
+    end
+    
+end)

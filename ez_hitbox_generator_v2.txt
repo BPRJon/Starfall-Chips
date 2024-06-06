@@ -1,0 +1,49 @@
+--@name EZ Hitbox Generator v2
+--@author jon b, Adversarius
+--@server
+
+--[[
+    This is an improved version of my original hitbox generator. This one more closely relates to the on in the 6DoB ship base (which is why I added Adversarius as an author)
+]]
+
+--This table will make basic cubes automatically
+local QuickCubes = {
+  --{L,W,H,Origin}
+    {50,10,10,Vector()},
+    {30,20,20,Vector(0,0,10)}
+}
+
+--This is where you can input your own verticies 
+local CustomMesh = {
+    --[[
+    {
+        Vector(0,0,0),Vector(0,0,0),Vector(0,0,0),Vector(0,0,0),
+        Vector(0,0,0),Vector(0,0,0),Vector(0,0,0),Vector(0,0,0)
+    }
+    ]]
+    {
+        Vector(25,5,5),Vector(25,-5,5),Vector(25,5,-5),Vector(25,-5,-5),
+        Vector(70,2,2),Vector(70,-2,2),Vector(70,2,-2),Vector(70,-2,-2)
+    }
+}
+
+function CreateHitbox(tblQC,tblCM)
+    local supertable = {}
+    
+    for i,v in pairs(tblQC) do
+        tbl = {
+            Vector(tblQC[i][1]/2,tblQC[i][2]/2,tblQC[i][3]/2)+tblQC[i][4],Vector(-tblQC[i][1]/2,tblQC[i][2]/2,tblQC[i][3]/2)+tblQC[i][4],Vector(tblQC[i][1]/2,-tblQC[i][2]/2,tblQC[i][3]/2)+tblQC[i][4],Vector(-tblQC[i][1]/2,-tblQC[i][2]/2,tblQC[i][3]/2)+tblQC[i][4],
+            Vector(tblQC[i][1]/2,tblQC[i][2]/2,-tblQC[i][3]/2)+tblQC[i][4],Vector(-tblQC[i][1]/2,tblQC[i][2]/2,-tblQC[i][3]/2)+tblQC[i][4],Vector(tblQC[i][1]/2,-tblQC[i][2]/2,-tblQC[i][3]/2)+tblQC[i][4],Vector(-tblQC[i][1]/2,-tblQC[i][2]/2,-tblQC[i][3]/2)+tblQC[i][4]
+        }
+        
+        supertable[i] = tbl
+    end
+    for i,v in pairs(CustomMesh) do
+        local _,findTbl = mesh.findConvexHull(v)
+        CustomMesh[i] = findTbl
+    end
+    
+    return prop.createCustom(chip():getPos(),Angle(),table.add(supertable,CustomMesh),true)
+end
+
+local Hitbox = CreateHitbox(QuickCubes,CustomMesh)
