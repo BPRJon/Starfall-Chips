@@ -1,0 +1,48 @@
+--@name RollerBomb
+--@author jon b
+--@server
+
+changedTable = {}
+function changed(index,obj)
+    local bool = (obj ~= changedTable[index])
+    changedTable[index] = obj
+    return bool
+end
+
+Roller = prop.create(chip():getPos()+Vector(0,0,20),Angle(),"models/Roller.mdl",false)
+Explosion = effect.create()
+Health = 50
+
+hook.add("tick","rolerbomb tick",function()
+    if isValid(Roller) then
+        RollerPos = Roller:getPos()
+    else
+        Roller = prop.create(chip():getPos()+Vector(0,0,20),Angle(),"models/Roller.mdl",false)
+        Health = 150
+    end
+    if changed(1,math.floor(timer.curtime()*16.5)) then
+        Sphere = find.inSphere(RollerPos,1000,function(ent) if ent:getClass() == "player" and ent ~= owner() then return true else return false end end)
+        Sphere = find.sortByClosest(Sphere,RollerPos,false)
+    end
+    if isValid(Roller:getPhysicsObject()) and isValid(Sphere[1]) then
+        TGTPos = Sphere[1]:getPos()
+        if RollerPos:getDistance(TGTPos) < 70 then
+            game.blastDamage(RollerPos,100,500)
+            Explosion:setOrigin(RollerPos)
+            Explosion:play("Explosion")
+            Roller:remove()
+        else
+            Roller:addVelocity((TGTPos-RollerPos):setZ(0)/15)
+        end
+    end
+end)
+hook.add("EntityTakeDamage","Rollerdamage",function(target,attacker,inflicter,amount,type,pos,force)
+    if target == Roller then
+        Health = Health - amount
+        if Health < 1 and isValid(Roller) then
+            Explosion:setOrigin(RollerPos)
+            Explosion:play("Explosion")
+            Roller:remove()
+        end
+    end
+end)
