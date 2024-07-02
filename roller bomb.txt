@@ -11,28 +11,37 @@ end
 
 Roller = prop.create(chip():getPos()+Vector(0,0,20),Angle(),"models/Roller.mdl",false)
 Explosion = effect.create()
-Health = 50
+Health = 1
 
 hook.add("tick","rolerbomb tick",function()
     if isValid(Roller) then
         RollerPos = Roller:getPos()
-    else
-        Roller = prop.create(chip():getPos()+Vector(0,0,20),Angle(),"models/Roller.mdl",false)
-        Health = 150
+        proc = 0
+    elseif proc == 0 then
+        timer.create("RollerBomb Respawn",3,1,function()
+            Roller = prop.create(chip():getPos()+Vector(0,0,20),Angle(),"models/Roller.mdl",false)
+            Health = 1
+        end)
+        timer.start("RollerBomb Respawn")
+        proc = 1
     end
-    if changed(1,math.floor(timer.curtime()*16.5)) then
-        Sphere = find.inSphere(RollerPos,1000,function(ent) if ent:getClass() == "player" and ent ~= owner() then return true else return false end end)
-        Sphere = find.sortByClosest(Sphere,RollerPos,false)
-    end
-    if isValid(Roller:getPhysicsObject()) and isValid(Sphere[1]) then
-        TGTPos = Sphere[1]:getPos()
-        if RollerPos:getDistance(TGTPos) < 70 then
-            game.blastDamage(RollerPos,100,500)
-            Explosion:setOrigin(RollerPos)
-            Explosion:play("Explosion")
-            Roller:remove()
-        else
-            Roller:addVelocity((TGTPos-RollerPos):setZ(0)/15)
+    if isValid(Roller) and isValid(Roller:getPhysicsObject()) then
+        if changed(1,math.floor(timer.curtime()*16.5)) then
+            Sphere = find.inSphere(RollerPos,1000,function(ent) if ent:getClass() == "player" and ent ~= owner() then return true else return false end end)
+            Sphere = find.sortByClosest(Sphere,RollerPos,false)
+        end
+        if isValid(Sphere[1]) then
+            TGTPos = Sphere[1]:getPos()
+            if RollerPos:getDistance(TGTPos) < 70 then
+                game.blastDamage(RollerPos,100,200)
+                Explosion:setOrigin(RollerPos)
+                Explosion:play("Explosion")
+                Roller:remove()
+            else
+                local Speed = TGTPos-RollerPos
+                local SpeedVec = Vector(math.clamp(Speed.x,-10,10),math.clamp(Speed.y,-10,10),0)/1.5
+                Roller:addVelocity(SpeedVec)
+            end
         end
     end
 end)
@@ -41,7 +50,7 @@ hook.add("EntityTakeDamage","Rollerdamage",function(target,attacker,inflicter,am
         Health = Health - amount
         if Health < 1 and isValid(Roller) then
             Explosion:setOrigin(RollerPos)
-            Explosion:play("Explosion")
+            Explosion:play("Sparks")
             Roller:remove()
         end
     end
