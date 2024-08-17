@@ -1,0 +1,190 @@
+--@name Capture Point V1
+--@author jon b
+--@shared
+
+if SERVER then
+    local changedTable = {}
+    local function changed(index,obj)
+        local bool = (obj ~= changedTable[index])
+        changedTable[index] = obj
+        return bool
+    end
+    function ownerdefending(findtbl,ply)
+        for i,v in pairs(findtbl) do
+            if v == ply then return true end
+            if v ~= ply and i == table.count(findtbl) then return false end
+        end
+    end
+    HUD = prop.createComponent(chip():getPos()+Vector(0,0,5),Angle(),"starfall_hud","models/bull/dynamicbuttonsf.mdl",true)
+    HUD:linkComponent(chip())
+    CapturePoints = {}
+    CaptureOwner = {}
+    Scoreboard = {}
+    startGame = false
+    capTime = 300
+    
+    net.receive("Create-Point",function()
+        local pos = net.readVector()
+        local ang = net.readVector():getAngle()
+        local cap = prop.create(pos,ang+Angle(90,0,0),"models/props_gameplay/cap_point_base.mdl",true)
+        
+        CapturePoints[table.count(CapturePoints)+1] = cap
+    end)
+    net.receive("Undo-Point",function()
+        if table.count(CapturePoints) > 0 and isValid(CapturePoints[table.count(CapturePoints)]) then
+            CapturePoints[table.count(CapturePoints)]:remove()
+            table.remove(CapturePoints,table.count(CapturePoints))
+        end
+    end)
+    net.receive("Capture-Point-Init",function()
+        startGame = true
+        for i,_ in pairs(CapturePoints) do
+            CaptureOwner[i] = {nil,capTime}
+        end
+        Players = find.allPlayers(function(ent) if ent:isHUDActive() then return true else return false end end)
+        for i,v in pairs(Players) do
+            Scoreboard[i] = {v,0}
+        end
+        table.sortByKey(Scoreboard,true)
+        net.start("CapOwnerChange")
+        net.writeTable(CapturePoints)
+        net.writeTable(CaptureOwner)
+        net.writeTable(Scoreboard)
+        net.send()
+    end)
+    hook.add("hudconnected","connectupdate",function(ent,ply)
+        if ent == HUD then
+            Players = find.allPlayers(function(ent) if ent:isHUDActive() then return true else return false end end)
+            local exists = false
+            for k, v in ipairs(Scoreboard) do
+                if v[1] == ply then
+                    exists = true
+                    break
+                end
+            end
+            if not exists then 
+                Scoreboard[#Scoreboard+1] = {ply,0}
+            end --ty bonyoze
+        end
+    end)
+    hook.add("tick","gametick",function()
+        if startGame then
+            for i,v in pairs(CapturePoints) do
+                local cappos = v:getPos()
+                local capang = v:getAngles()
+                Find = find.inBox(cappos+(Vector(-250,-250,0)),cappos+(Vector(250)),function(ent) if ent:getClass() == "player" and ent:isHUDActive() then return true else return false end end)
+                findCount = table.count(Find)
+                if findCount > 0 and not ownerdefending(Find,CaptureOwner[i][1]) and CaptureOwner[i][2] > 0 then
+                    CaptureOwner[i][2] = CaptureOwner[i][2] - 1
+                elseif findCount == 1 and CaptureOwner[i][2] <= 0 then
+                    CaptureOwner[i] = {Find[1],capTime}
+                    v:emitSound("ui/scored.wav")
+                elseif CaptureOwner[i][2] < capTime then
+                    CaptureOwner[i][2] = CaptureOwner[i][2] + 0.01
+                end
+            end
+            for i,v in pairs(CaptureOwner) do
+                for a,b in pairs(Scoreboard) do
+                    if v[1] == b[1] then
+                        b[2] = b[2] + 0.01
+                    end
+                end
+            end
+            if changed(1337,math.floor(timer.curtime()*16.5)) then
+                net.start("CapOwnerChange")
+                net.writeTable(CapturePoints)
+                net.writeTable(CaptureOwner)
+                table.sort(Scoreboard,function(a,b) if a[2]>b[2] then return true end end)
+                net.writeTable(Scoreboard)
+                net.send()
+            end
+        end
+    end)
+end
+
+
+
+if CLIENT then
+    if player() == owner() then
+        local changedTable = {}
+        local function changed(index,obj)
+            local bool = (obj ~= changedTable[index])
+            changedTable[index] = obj
+            return bool
+        end
+        enableHud(owner(),true)
+        print([[Welcome to Capture Point V1 by jon b
+
+    I - End Creation
+    O - Place Capture Point
+    P - Undo Last Capture Point]])
+        hook.add("tick","tick-init",function()
+            I = input.isKeyDown(KEY.I)
+            O = input.isKeyDown(KEY.O)
+            P = input.isKeyDown(KEY.P)
+            if changed(1,I) and I then
+                print("Creation Ended")
+                net.start("Capture-Point-Init")
+                net.send(owner())
+                notification.addLegacy("Starting up Capture Points",2,3)
+                hook.remove("tick","tick-init")
+            end
+            if changed(2,O) and O then
+                net.start("Create-Point")
+                net.writeVector(owner():getEyeTrace().HitPos)
+                net.writeVector(owner():getEyeTrace().HitNormal)
+                net.send(owner())
+                notification.addLegacy("Created new point",5,3)
+            end
+            if changed(3,P) and P then
+                net.start("Undo-Point")
+                net.send(owner())
+                notification.addLegacy("Undid last point",3,3)
+            end
+        end)
+    end
+    local cappoints = {}
+    local capowner = {}
+    local scoreboard = {}
+    hook.add("postdrawhud","globaldrawtick",function()
+        net.receive("CapOwnerChange",function()
+            cappoints = net.readTable()
+            capowner = net.readTable()
+            scoreboard = net.readTable()
+        end)
+        if table.count(cappoints) > 0 then
+            for i,v in pairs(cappoints) do
+                local npos = (v:getPos()+Vector(0,0,200)):toScreen()
+                local name = "nil"
+                if capowner[i][1] ~= nil then
+                    name = string.patternSafe(capowner[i][1]:getName())
+                end
+                render.setColor(Color(0,0,0,200))
+                render.drawRect(npos.x-(#name/2)*7,npos.y-15,#name*7,30)
+                render.drawRect(npos.x-25,npos.y+30,50,20)
+                render.setColor(Color(255,255,255))
+                render.drawSimpleText(npos.x,npos.y,name,1,1)
+                render.drawSimpleText(npos.x,npos.y+40,math.round(capowner[i][2]),1,1)
+            end
+        end
+        if table.count(scoreboard) > 0 then
+            local index = 0
+            local clrtbl = {
+                Color(255,255,0,150),
+                Color(155,155,155,150),
+                Color(200,100,50,150),
+                Color(50,50,50,150)
+            }
+            for i,v in pairs(scoreboard) do
+                index = index + 1
+                local info = string.patternSafe(v[1]:getName())..": "..math.round(v[2])
+                if index <= 4 then
+                    render.setColor(clrtbl[index])
+                    render.drawRect(25,42+(20*index),#info*7,20)
+                    render.setColor(Color(255,255,255))
+                    render.drawSimpleText(30,50+(20*index),info,0,1)
+                end
+            end
+        end
+    end)
+end
