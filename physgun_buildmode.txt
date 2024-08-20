@@ -1,0 +1,96 @@
+--@name Physgun Buildmode
+--@author jon b
+--@shared
+if SERVER then
+    SnapDecimal = 0 --0 is the ones place, 1 is tens, so on
+    
+    net.receive("C2S-buildmode-buttons",function()
+        KillChip = net.readBool()
+        Nocollide = net.readBool()
+        Freeze = net.readBool()
+        LockRot = net.readBool()
+        GridSnap = net.readBool()
+        if KillChip == true then
+            chip():remove()
+        end
+    end)
+    hook.add("physgunpickup","buildmode-grab",function(ply,ent)
+        local allowed = ent:getOwner() == owner() and ent:getClass() == "prop_physics"
+        if allowed then
+            if Nocollide then
+                ent:setCollisionGroup(COLLISION_GROUP.IN_VEHICLE)
+            end
+            if LockRot then
+                ang = ent:getAngles()
+                hook.add("tick","buildmode-lockrotation",function()
+                    ent:setAngles(ang)
+                end)
+            end
+        end
+    end)
+    hook.add("physgundrop","buildmode-drop",function(ply,ent)
+        local allowed = ent:getOwner() == owner() and ent:getClass() == "prop_physics"
+        if allowed then
+            if Nocollide then
+                ent:setCollisionGroup(COLLISION_GROUP.NONE)
+            end
+            if Freeze and not ent:isFrozen() then
+                ent:setFrozen(true)
+            end
+            if LockRot then
+                hook.remove("tick","buildmode-lockrotation")
+                timer.simple(0.1,function()
+                    ent:setAngles(ang)
+                end)
+            end
+            if GridSnap then
+                pos = ent:getPos()-ent:obbCenter()
+                pos:round(SnapDecimal)
+                ent:setPos(pos)
+            end
+        end
+    end)
+end
+
+if CLIENT then
+    local changedTable = {}
+    function changed(index,obj)
+        local bool = (obj ~= changedTable[index])
+        changedTable[index] = obj
+        return bool
+    end
+    local btntbl = {}
+    local function button(index,x,y,str,defaultbool)
+        if btntbl[index] == nil then
+            btntbl[index] = defaultbool
+        end
+        local w,h = render.getTextSize(str)
+        local mx,my = input.getCursorPos()
+        local clk = input.isMouseDown(MOUSE.LEFT) and mx > x and mx < x+w+6 and my > y and my < y+h+6
+        local clr = Color(70,70,70)
+        if changed(index,clk) and clk then
+            btntbl[index] = not btntbl[index]
+        end
+        if btntbl[index] == true then
+            clr = Color(20,200,50)
+        end
+        render.setColor(clr)
+        render.drawRect(x,y,w+6,h+6)
+        render.setColor(Color(255,255,255))
+        render.drawSimpleText(x+(w+6)/2,y+(h+6)/2,str,TEXT_ALIGN.CENTER,TEXT_ALIGN.CENTER)
+        return btntbl[index]
+    end
+    if player() == owner() then
+        enableHud(owner(),true)
+        hook.add("postdrawhud","buildmode-ui",function()
+            local scrnw,scrnh = render.getGameResolution()
+            net.start("C2S-buildmode-buttons")
+                net.writeBool(button(-1,scrnw*0.01,30,"Remove Chip",false)) --if you set this to true please watch this video: https://youtu.be/aqAUmgE3WyM?t=13
+                net.writeBool(button(1,scrnw*0.05,100,"Nocollide on Grab",true)) --you see the true/false (bool) at the end of this? thats the default position of the button (true is on false is off)
+                net.writeBool(button(2,scrnw*0.05,130,"Freeze on Drop",true))
+                net.writeBool(button(3,scrnw*0.05,160,"No Rotation during Grab",false))
+                net.writeBool(button(4,scrnw*0.05,190,"Grid Snap",false))
+            net.send(owner())
+        end)
+    end
+end
