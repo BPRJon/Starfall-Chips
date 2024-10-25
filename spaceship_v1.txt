@@ -1,7 +1,6 @@
 --@name Spaceship V1
 --@author jon b
 --@shared
---@include holograms/spaceship v1 holos.txt
 if SERVER then
     chip():setSkin(1)
     
