@@ -1,0 +1,209 @@
+--@name Spaceship V1
+--@author jon b
+--@shared
+--@include holograms/spaceship v1 holos.txt
+if SERVER then
+    chip():setSkin(1)
+    
+    --This table will make basic cubes automatically
+    local QuickCubes = {
+      --{L,W,H,Origin}
+        {160,80,50,Vector(35,0,0)},
+        {160,150,30,Vector(35,0,-5)},
+        {100,60,60,Vector(-90,0,0)},
+        {10,115,20,Vector(-195,0,28)},
+        {150,40,50,Vector(-100,50,2)},
+        {150,40,50,Vector(-100,-50,2)},
+        {100,15,3,Vector(-140,-23,35)},
+        {100,15,3,Vector(-140,23,35)},
+        {60,35,50,Vector(13,0,30)}
+    }
+    
+    --This is where you can input your own verticies 
+    local CustomMesh = {
+        --[[
+        {
+            Vector(0,0,0),Vector(0,0,0),Vector(0,0,0),Vector(0,0,0),
+            Vector(0,0,0),Vector(0,0,0),Vector(0,0,0),Vector(0,0,0)
+        }
+        ]]
+        {
+            Vector(70,70,0),Vector(70,-70,0),Vector(-70,70,0),Vector(-70,-70,0),
+            Vector(70,40,-40),Vector(70,-40,-40),Vector(-70,40,-40),Vector(-70,-40,-40)
+        }
+    }
+    
+    function CreateHitbox(tblQC,tblCM)
+        local supertable = {}
+        
+        for i,v in pairs(tblQC) do
+            tbl = {
+                Vector(tblQC[i][1]/2,tblQC[i][2]/2,tblQC[i][3]/2)+tblQC[i][4],Vector(-tblQC[i][1]/2,tblQC[i][2]/2,tblQC[i][3]/2)+tblQC[i][4],Vector(tblQC[i][1]/2,-tblQC[i][2]/2,tblQC[i][3]/2)+tblQC[i][4],Vector(-tblQC[i][1]/2,-tblQC[i][2]/2,tblQC[i][3]/2)+tblQC[i][4],
+                Vector(tblQC[i][1]/2,tblQC[i][2]/2,-tblQC[i][3]/2)+tblQC[i][4],Vector(-tblQC[i][1]/2,tblQC[i][2]/2,-tblQC[i][3]/2)+tblQC[i][4],Vector(tblQC[i][1]/2,-tblQC[i][2]/2,-tblQC[i][3]/2)+tblQC[i][4],Vector(-tblQC[i][1]/2,-tblQC[i][2]/2,-tblQC[i][3]/2)+tblQC[i][4]
+            }
+            
+            supertable[i] = tbl
+        end
+        for i,v in pairs(CustomMesh) do
+            local _,findTbl = mesh.findConvexHull(v)
+            CustomMesh[i] = findTbl
+        end
+        
+        return prop.createCustom(chip():getPos(),Angle(),table.add(supertable,CustomMesh),true)
+    end
+    function keyPress(inkey)
+        if owner():keyDown(inkey) then return 1 else return 0 end
+    end
+    
+    function CreateHolos(holotbl)
+        local holoindex = 0
+        local holos = {}
+        hook.add("tick","holo-creation-tick",function()
+            while chip():getQuotaUsed() < chip():getQuotaMax()*maxquota and holoindex < table.count(holotbl) do
+                holoindex = holoindex + 1
+                local holodata = holotbl[holoindex]
+                local holo = hologram.create(holodata[1]+chip():getPos(),holodata[2],holodata[3],holodata[4])
+                holos[holoindex] = holo
+                if holodata[5] ~= nil then
+                    holo:setColor(holodata[5])
+                end
+                if holodata[6] ~= nil then
+                    holo:setMaterial(holodata[6])
+                end
+                if holodata[7] ~= nil then
+                    if type(holodata[7]) == "string" then
+                        holo:setParent(Holos[holodata[7]])
+                    else
+                        holo:setParent(holodata[7])
+                    end
+                end
+                if holodata[8] ~= nil then
+                    Holos[holodata[8]] = holo
+                end
+                if holodata[9] ~= nil then
+                    for i,v in pairs(holodata[9]) do
+                        holo:setClip(i,true,v[1],v[2],holo)
+                    end
+                end
+                if printdone and holoindex == table.count(holotbl) then
+                    print("Holos Created!")
+                end
+            end
+            holosdone = true
+        end)
+    end
+    
+    function keynum(ent,key)
+        if ent:keyDown(IN_KEY[key]) then return 1 else return 0 end
+    end
+    
+    Hitbox = CreateHitbox(QuickCubes,CustomMesh)
+    Hitbox:setMass(15000)
+    Hitbox:setColor(Color(0,0,0,0))
+    Seat = prop.createSeat(chip():getPos(),Angle(),"models/nova/airboat_seat.mdl",false)
+    Seat:setParent(Hitbox)
+    timer.simple(0.5,function()
+        Hitbox:setPos(chip():getPos()+Vector(0,100,100))
+        Hitbox:setPhysMaterial("metal")
+        
+        net.start("server-to-client")
+        net.writeEntity(Hitbox)
+        net.writeEntity(Seat)
+        net.send()
+        
+        Hitbox:setFrozen(false)
+    end)
+    
+        maxquota = 0.6 --How much CPU quota the function can use. 1 is 100% quota .01 is 1% quota.
+    printdone = false --set to false if you dont want it to tell you when it is done loading
+    --default values
+    pos = Vector()
+    ang = Angle()
+    model = "models/balloons/balloon_dog.mdl"
+    scale = Vector(1)
+    --optional values
+    --anything here you can set to nil to skip
+    color = Color(255,0,0,255)
+    mat = ""
+    parent = Hitbox --set this to either an entity, OR put the string name of a parent holo that is also in the CreationTable and it will be parentedmm
+    name = nil --a string to identify the holo as so it can be put in the Holos table. Also used to find the holo if another holo wants to parent to it
+    clips = nil --{{Vector(),Vector(0,1,0)}}
+    --[[
+    HOLO CLIPS
+    
+    we load clips form the 'clips' subtable, every clip must also be a subtable
+    each clip needs a position and normal, both vectors
+    (ex: {{Vector(0,0,0),Vector(0,1,0)},{Vector(0,20,0),Vector(1,0,0)}})
+    ]]
+    
+    Holos = {} -- <- dont touch this one
+    CreationTable = {
+    {Vector(0,0,-15.5),Angle(-90,0,0),"models/props_c17/FurnitureFridge001a.mdl",Vector(2,2,2),Color(255,255,255,255),"models/props/cs_assault/metal_stairs1",parent,name,{}},
+    {Vector(43,-60,0),Angle(90,-90,90),"models/props_wasteland/buoy01.mdl",Vector(1,1,1),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(0,37,-17),Angle(0,0,-90),"models/props_wasteland/laundry_washer003.mdl",Vector(1.125,0.76499998569489,0.76499998569489),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(0,-36,-17),Angle(0,180,-90),"models/props_wasteland/laundry_washer003.mdl",Vector(1.125,0.76499998569489,0.76499998569489),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(-90,-60,0),Angle(0,0,90),"models/props_combine/headcrabcannister01a.mdl",Vector(1.2999999523163,1.2999999523163,1.2999999523163),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(-123,0,0),Angle(90,0,0),"models/props_wasteland/laundry_basket001.mdl",Vector(1.2999999523163,1,1),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(43,60,0),Angle(-90,0,0),"models/props_wasteland/buoy01.mdl",Vector(1,1,1),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(0,44,-14),Angle(-46,90,-180),"models/props_wasteland/controlroom_desk001a.mdl",Vector(1,1,1),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(0,-44,-14),Angle(46,90,-180),"models/props_wasteland/controlroom_desk001a.mdl",Vector(-1,-1,1),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(12.533399581909,0,35.684600830078),Angle(-90,-180,0),"models/props_junk/trashbin01a.mdl",Vector(1.5,1.5,1.5),Color(255,255,255,255),"models/props/cs_assault/metal_stairs1",parent,name,{}},
+    {Vector(13,0,55),Angle(0,-180,0),"models/props_wasteland/tram_leverbase01.mdl",Vector(1.2999999523163,1.2999999523163,1.6900000572205),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(66.496299743652,0.00019999999494758,0),Angle(-90,0,0),"models/props_lab/blastdoor001a.mdl",Vector(1.2000000476837,1.2000000476837,1.2000000476837),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(58,-48,-33.716800689697),Angle(0,0,134),"models/maxofs2d/hover_plate.mdl",Vector(1,1,1),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(58,48,-33.716800689697),Angle(0,0,-134),"models/maxofs2d/hover_plate.mdl",Vector(1,1,1),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(-58,48,-33.716800689697),Angle(0,0,-134),"models/maxofs2d/hover_plate.mdl",Vector(1,1,1),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(-70,1.6000000238419,35),Angle(-90,0,0),"models/props_interiors/Radiator01a.mdl",Vector(1.2999999523163,1.2999999523163,1.2999999523163),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(13,17,43),Angle(0,0,-90),"models/props_wasteland/tram_leverbase01.mdl",Vector(1.2999999523163,1.2999999523163,1.6900000572205),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(90.369598388672,0.00050000002374873,2.9756000041962),Angle(0,0,0),"models/props_junk/TrashDumpster01a.mdl",Vector(1,1,1),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(43,0,43),Angle(0,-90,-90),"models/props_wasteland/tram_leverbase01.mdl",Vector(1.2999999523163,1.2999999523163,1.6900000572205),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(-90,60,0),Angle(0,0,-90),"models/props_combine/headcrabcannister01a.mdl",Vector(1.2999999523163,1.2999999523163,1.2999999523163),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(-58,-48,-33.716800689697),Angle(0,0,134),"models/maxofs2d/hover_plate.mdl",Vector(1,1,1),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(-145.4382019043,0,3.4179999828339),Angle(0,180,0),"models/props_trainstation/mount_connection001a.mdl",Vector(1.9500000476837,3,1.7999999523163),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(-68,0,3.7000000476837),Angle(0,-106,0),"models/props_wasteland/laundry_washer001a.mdl",Vector(1,1,1),Color(255,255,255,255),nil,parent,name,{}},
+    {Vector(13,-17,43),Angle(0,180,-90),"models/props_wasteland/tram_leverbase01.mdl",Vector(1.2999999523163,1.2999999523163,1.6900000572205),Color(255,255,255,255),nil,parent,name,{}}
+    }
+    
+    CreateHolos(CreationTable)
+    
+    hook.add("PlayerUse","spaceship-v1-use",function(ply,ent)
+        if ent == Hitbox and ply == owner() and Driver ~= owner() then
+            Seat:use()
+        end
+    end)
+    hook.add("PlayerLeaveVehicle","starfighter-leavechair",function(ply,ent) if ent == Seat then Seat:lock() canSit = false timer.simple(1,function() Seat:unlock() canSit = true end) end end)
+    hook.add("PlayerEnteredVehicle","starfighter-enablehud",function(ply,veh,num) if veh == Seat then enableHud(ply,true) end end)
+    hook.add("tick","spaceship-think",function()
+        Driver = Seat:getDriver()
+        if Driver:isValid() then
+            Hitbox:getPhysicsObject():addVelocity(Vector(0,0,600)*game.getTickInterval()+Vector(10*(keynum(Driver,"FORWARD")-keynum(Driver,"BACK")),7*(keynum(Driver,"MOVELEFT")-keynum(Driver,"MOVERIGHT")),4*(keynum(Driver,"JUMP")-keynum(Driver,"DUCK"))):getRotated(Hitbox:getAngles():setR(0))-Hitbox:getVelocity()/50)
+            Hitbox:getPhysicsObject():addAngleVelocity((Seat:worldToLocalAngles(Driver:getEyeAngles())-Hitbox:getAngles()):getQuaternion():getRotationVector()-Hitbox:getAngleVelocity()/5)
+        end
+    end)
+end
+
+
+
+if CLIENT then
+    net.receive("server-to-client",function()
+        fighter = net.readEntity()
+        seat = net.readEntity()
+        end)
+    hook.add("calcview", "view calc", function()
+        if isValid(seat) then
+            driver = seat:getDriver()
+            isDriver = player()==driver
+        else
+            isDriver = false
+        end
+        if isDriver then
+            rotatevec = fighter:getPos()+Vector(-300,0,150):getRotated(eyeAngles())
+            local view = {
+                origin = rotatevec,
+                angles = driver:getEyeAngles()
+            }
+            
+            return view
+        end
+        end)
+end
