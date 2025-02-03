@@ -1,0 +1,112 @@
+--@name Holomap V1
+--@author jon b
+--@shared
+if SERVER then
+    players,plyholos = {},{}
+    chipPos,chipAng = chip():getPos(),chip():getAngles()
+    size = 160
+    zOffset = chip():getPos().z/size
+    function updatePlayers()
+        players = find.allPlayers()
+        for i,v in pairs(plyholos) do
+            if isValid(v) then v:remove() table.removeByValue(plyholos,v) end
+        end
+
+        for _,v in pairs(players) do
+            local holo = hologram.create(chipPos,chipAng,"models/hunter/blocks/cube025x025x025.mdl",Vector(0.1,0.1,0.01))
+            holo:setMaterial("model_color") holo:setColor(Color(255,50,50))
+            plyholos[v] = holo
+        end
+    end
+    hook.add("ClientInitialized","",function(ply)
+        updatePlayers()
+    end)
+
+    hook.add("PlayerInitialSpawn","",function()
+        updatePlayers()
+    end)
+
+    hook.add("PlayerDisconnected","",function()
+        updatePlayers()
+    end)
+
+    hook.add("think","",function()
+        for i,v in pairs(plyholos) do
+            if isValid(v) and isValid(i) then
+                v:setPos(chipPos+(i:getPos()/size-Vector(0,0,zOffset-20)):getRotated(chipAng))
+                if i:getHealth() > 0 then v:setRenderFX(RENDERFX.SOLIDFAST) else v:setRenderFX(RENDERFX.FADEFAST) end
+            end
+        end
+    end)
+elseif CLIENT then
+    local players,plyholos = {},{}
+    local chipPos,chipAng = chip():getPos(),chip():getAngles()
+    local size = 160
+    local zOffset = chip():getPos().z/size
+
+    local surfaces,verts,tris,norm = game.getWorld():getBrushSurfaces(),{},{},{}
+
+    local co = coroutine.wrap(function()
+        for _,v in pairs(surfaces) do
+            if not v:isSky() and not v:isNoDraw() and not v:isWater() then table.insert(verts,v:getVertices()) end
+            coroutine.yield()
+        end
+
+        for i,v in pairs(verts) do
+            if #v < 3 then table.remove(verts,i)
+            elseif #v == 3 then table.insert(tris,v)
+            else
+                for i=2,#v-1 do
+                    table.insert(tris,{v[1],v[i],v[i+1]})
+                    local toA = (v[i]-v[1]):getNormalized()
+                    local toB = (v[i+1]-v[1]):getNormalized()
+                    table.insert(norm,toB:cross(toA))
+                end
+            end
+
+            coroutine.yield()
+        end
+
+        local current,result = {},{}
+        for _,v in pairs(tris) do
+            table.insert(current,v)
+            if #current == 6000 then
+                table.insert(result,current)
+                current = {}
+            end
+
+            coroutine.yield()
+        end
+
+        if #current > 0 then table.insert(result,current) end
+        for _,v in pairs(result) do
+            local Mesh = mesh.createEmpty()
+            mesh.generate(Mesh,MATERIAL.TRIANGLES,#v,function()
+                for _,tbl in pairs(v) do
+                    for i,vert in pairs(tbl) do mesh.writePosition(vert/size-Vector(0,0,zOffset-20)) mesh.writeNormal(norm[i]) mesh.advanceVertex() end
+                end
+            end)
+
+            local holo = hologram.create(chipPos,chipAng,"models/hunter/blocks/cube025x025x025.mdl",Vector(1))
+            holo:setMesh(Mesh)
+            holo:setMaterial("model_color")
+            holo:setColor(Color(50,255,255,50))
+            holo:setRenderBounds(Vector(-200,-200,-50),Vector(200))
+            holo:setParent(chip())
+
+            coroutine.yield()
+        end
+
+        coroutine.yield(true)
+    end)
+
+    hook.add("tick","swaos",function() 
+        while chip():getQuotaAverage() <= chip():getQuotaMax() * 0.5 do
+            if co() then hook.remove("tick","swaos") break end
+        end 
+    end)
+
+    net.receive("updatePlayers",function()
+
+    end)
+end
